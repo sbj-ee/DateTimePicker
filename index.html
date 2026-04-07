@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Date &amp; Time Picker with Time Zone</title>
+  <title>Device Date &amp; Time Picker with Time Zone</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -119,56 +119,47 @@
     .cal-grid .day.selected:hover { background: #3a5ce5; }
     .cal-grid .day.other-month { color: #ccc; }
 
-    /* Time slider */
+    /* Time input */
     .time-section { margin-bottom: 20px; }
-    .time-display {
+    .time-inputs {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .time-inputs input[type="number"] {
+      width: 72px;
+      padding: 10px 12px;
+      font-size: 1.4rem;
+      font-weight: 700;
       text-align: center;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #fafafa;
+      color: #1a1a2e;
+      transition: border-color 0.2s;
+      -moz-appearance: textfield;
+    }
+    .time-inputs input[type="number"]::-webkit-inner-spin-button,
+    .time-inputs input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .time-inputs input[type="number"]:focus {
+      outline: none;
+      border-color: #4a6cf7;
+      box-shadow: 0 0 0 3px rgba(74,108,247,0.15);
+    }
+    .time-inputs .time-sep {
       font-size: 1.6rem;
       font-weight: 700;
       color: #1a1a2e;
-      margin-bottom: 12px;
-      letter-spacing: 0.02em;
     }
-    .slider-group { margin-bottom: 12px; }
-    .slider-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.8rem;
+    .time-inputs .time-label {
+      font-size: 0.75rem;
       color: #888;
-      margin-bottom: 4px;
-    }
-    input[type="range"] {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-      height: 8px;
-      border-radius: 4px;
-      background: #e2e6f0;
-      outline: none;
-      transition: background 0.2s;
-    }
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: #4a6cf7;
-      cursor: pointer;
-      box-shadow: 0 2px 6px rgba(74,108,247,0.4);
-      transition: transform 0.15s;
-    }
-    input[type="range"]::-webkit-slider-thumb:hover {
-      transform: scale(1.15);
-    }
-    input[type="range"]::-moz-range-thumb {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: #4a6cf7;
-      cursor: pointer;
-      border: none;
-      box-shadow: 0 2px 6px rgba(74,108,247,0.4);
+      text-align: center;
+      margin-top: 4px;
     }
     /* Result */
     .result {
@@ -195,10 +186,10 @@
 </head>
 <body>
   <div class="picker-card">
-    <h1>Date &amp; Time Picker</h1>
+    <h1>Device Date &amp; Time Picker</h1>
 
     <div class="field">
-      <label for="tz-select">Time Zone</label>
+      <label for="tz-select">Device Time Zone</label>
       <select id="tz-select"></select>
     </div>
 
@@ -214,14 +205,16 @@
 
     <label>Time</label>
     <div class="time-section">
-      <div class="time-display" id="time-display">12:00 PM</div>
-      <div class="slider-group">
-        <div class="slider-label"><span>Hour</span><span id="hour-val">12</span></div>
-        <input type="range" id="hour-slider" min="0" max="23" value="12">
-      </div>
-      <div class="slider-group">
-        <div class="slider-label"><span>Minute</span><span id="min-val">00</span></div>
-        <input type="range" id="min-slider" min="0" max="59" value="0">
+      <div class="time-inputs">
+        <div>
+          <input type="number" id="hour-input" min="0" max="23" value="12" placeholder="HH">
+          <div class="time-label">Hour</div>
+        </div>
+        <span class="time-sep">:</span>
+        <div>
+          <input type="number" id="min-input" min="0" max="59" value="0" placeholder="MM">
+          <div class="time-label">Minute</div>
+        </div>
       </div>
     </div>
 
@@ -230,6 +223,7 @@
       <div class="value" id="display-local"></div>
       <div class="value muted" id="display-iso"></div>
       <div class="value muted" id="display-utc"></div>
+      <div class="value muted" id="display-now" style="margin-top: 12px; padding-top: 10px; border-top: 1px solid #e2e6f0;"></div>
     </div>
   </div>
 
@@ -240,11 +234,8 @@
     const displayUtc = document.getElementById('display-utc');
     const calTitle = document.getElementById('cal-title');
     const calGrid = document.getElementById('cal-grid');
-    const hourSlider = document.getElementById('hour-slider');
-    const minSlider = document.getElementById('min-slider');
-    const hourVal = document.getElementById('hour-val');
-    const minVal = document.getElementById('min-val');
-    const timeDisplay = document.getElementById('time-display');
+    const hourInput = document.getElementById('hour-input');
+    const minInput = document.getElementById('min-input');
     // State
     let viewYear, viewMonth; // calendar navigation
     let selectedDate = null; // "YYYY-MM-DD"
@@ -321,23 +312,25 @@
       renderCalendar();
     });
 
-    // --- Time sliders ---
+    // --- Time inputs ---
+    function clampInput(input, min, max) {
+      let v = parseInt(input.value);
+      if (isNaN(v)) v = min;
+      if (v < min) v = min;
+      if (v > max) v = max;
+      input.value = v;
+    }
+
     function getTimeString() {
-      const h = parseInt(hourSlider.value);
-      const m = parseInt(minSlider.value);
+      const h = parseInt(hourInput.value) || 0;
+      const m = parseInt(minInput.value) || 0;
       return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
     }
 
-    function updateTimeDisplay() {
-      const h = String(hourSlider.value).padStart(2, '0');
-      const m = String(minSlider.value).padStart(2, '0');
-      hourVal.textContent = h;
-      minVal.textContent = m;
-      timeDisplay.textContent = `${h}:${m}`;
-    }
-
-    hourSlider.addEventListener('input', () => { updateTimeDisplay(); update(); });
-    minSlider.addEventListener('input', () => { updateTimeDisplay(); update(); });
+    hourInput.addEventListener('input', () => { update(); });
+    minInput.addEventListener('input', () => { update(); });
+    hourInput.addEventListener('blur', () => { clampInput(hourInput, 0, 23); update(); });
+    minInput.addEventListener('blur', () => { clampInput(minInput, 0, 59); update(); });
 
     // --- Timezone helpers ---
     function getPartsInTz(date, tz) {
@@ -412,6 +405,7 @@
         timeZoneName: 'short'
       });
       displayUtc.textContent = `Converted to UTC: ${utcFmt.format(utcDate)}`;
+      updateLocalConversion();
     }
 
     // --- Initialize ---
@@ -426,14 +420,46 @@
       viewMonth = m - 1;
       selectedDate = parts.date;
 
-      // Set time sliders to current time
+      // Set time inputs to current time
       const [hour, minute] = parts.time.split(':').map(Number);
-      hourSlider.value = hour;
-      minSlider.value = minute;
+      hourInput.value = hour;
+      minInput.value = minute;
 
       renderCalendar();
-      updateTimeDisplay();
       update();
+    }
+
+    // --- Selected time in user's local timezone ---
+    const displayNow = document.getElementById('display-now');
+    function updateLocalConversion() {
+      const dateVal = selectedDate;
+      const timeVal = getTimeString();
+      const tz = tzSelect.value;
+      const localTzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      if (!dateVal) {
+        displayNow.textContent = '';
+        return;
+      }
+
+      if (tz === localTzName) {
+        displayNow.textContent = '';
+        return;
+      }
+
+      const utcDate = wallClockToUtc(dateVal, timeVal, tz);
+      if (!utcDate || isNaN(utcDate)) {
+        displayNow.textContent = '';
+        return;
+      }
+
+      const fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone: localTzName,
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+        hour12: true, timeZoneName: 'short'
+      });
+      displayNow.textContent = `Your local time: ${fmt.format(utcDate)}`;
     }
 
     tzSelect.addEventListener('change', update);
